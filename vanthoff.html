@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>반트호프 열역학 분석 — ΔH°·ΔS°·ΔG°</title>
+<style>
+  :root{
+    --ink:#14202E; --paper:#FCFCFA; --panel:#FFFFFF; --line:#DDE2E6; --muted:#5E6B78;
+    --data:#1F4E79; --fit:#B0324B; --fit-weak:#F3E3E7; --ok:#1E6B4F; --warn:#9A5B00;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Consolas", "Menlo", monospace;
+    --sans: system-ui, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans); line-height:1.55; font-size:15px; -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px; margin:0 auto; padding:28px 22px 64px;}
+  a.back{font-size:12.5px; color:var(--muted); text-decoration:none;}
+  a.back:hover{color:var(--fit);}
+  header.site{border-bottom:1.5px solid var(--ink); padding-bottom:14px; margin:6px 0 22px;}
+  header.site h1{font-size:20px; font-weight:650; letter-spacing:-.01em; margin:0;}
+  header.site p{margin:6px 0 0; color:var(--muted); font-size:13.5px; max-width:74ch;}
+  header.site .eq{font-family:var(--mono); font-size:13px; background:#F4F6F7; border:1px solid var(--line); border-radius:5px; padding:2px 7px; display:inline-block; margin-top:10px;}
+  .grid{display:grid; grid-template-columns:minmax(360px,440px) 1fr; gap:22px; align-items:start;}
+  @media(max-width:860px){ .grid{grid-template-columns:1fr;} }
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px 18px 20px;}
+  .panel h2{font-size:13.5px; font-weight:650; margin:0 0 12px;}
+  .hint{color:var(--muted); font-size:12.5px; margin:10px 0 0;}
+  .opts{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px;}
+  .opts label{font-size:12.5px; color:var(--muted); display:flex; flex-direction:column; gap:4px;}
+  .opts select, .opts input{font-family:var(--sans); font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:5px; color:var(--ink); background:#fff;}
+  table.input{width:100%; border-collapse:collapse;}
+  table.input th{font-size:12.5px; font-weight:600; color:var(--muted); text-align:center; padding:0 4px 7px;}
+  table.input input{width:100%; font-family:var(--mono); font-size:13px; text-align:center; padding:6px 4px; border:1px solid var(--line); border-radius:5px; color:var(--ink); background:#fff;}
+  table.input input:focus{outline:2px solid var(--data); outline-offset:-1px; border-color:var(--data);}
+  td.del{width:30px; text-align:center;}
+  button.rowdel{border:none; background:none; color:var(--muted); cursor:pointer; font-size:16px; padding:4px;}
+  button.rowdel:hover{color:var(--fit);}
+  .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;}
+  button.act{font-size:13.5px; font-weight:600; border-radius:6px; padding:9px 16px; cursor:pointer; border:1.5px solid var(--fit); font-family:var(--sans);}
+  button.primary{background:var(--fit); color:#fff;} button.primary:hover{background:#8f2841;}
+  button.ghost{background:#fff; color:var(--fit);} button.ghost:hover{background:var(--fit-weak);}
+  button.tiny{font-size:12.5px; font-weight:600; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:5px; padding:6px 11px; cursor:pointer;}
+  button.tiny:hover{border-color:var(--data); color:var(--data);}
+  .chartwrap{display:flex; flex-direction:column;}
+  #chart{width:100%; background:#fff; border:1px solid var(--line); border-radius:8px;}
+  #chart svg{display:block; width:100%; height:auto;}
+  .readout{display:flex; margin-top:14px; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .readout .cell{flex:1; padding:12px 14px; border-right:1px solid var(--line);}
+  .readout .cell:last-child{border-right:none;}
+  .readout .k{font-size:11.5px; color:var(--muted); margin-bottom:3px;}
+  .readout .v{font-family:var(--mono); font-size:17px; font-weight:600; letter-spacing:-.01em;}
+  .readout .u{font-size:11px; color:var(--muted); margin-left:3px;}
+  .verdict{margin-top:14px; font-size:13.5px; padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#F7F9FA;}
+  .verdict b{font-weight:650;}
+  .tag{display:inline-block; font-family:var(--mono); font-size:11.5px; padding:1px 7px; border-radius:4px; margin-left:4px;}
+  .tag.ok{background:#E5F1EB; color:var(--ok);} .tag.warn{background:#F6ECDA; color:var(--warn);}
+  .tag.blue{background:#E4EDF5; color:var(--data);}
+  .results{margin-top:22px;}
+  .rescols{display:grid; grid-template-columns:1.25fr 1fr; gap:22px; align-items:start;}
+  @media(max-width:860px){ .rescols{grid-template-columns:1fr;} }
+  table.out{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+  table.out th{font-family:var(--sans); font-size:11.5px; font-weight:600; color:var(--muted); text-align:right; padding:7px 8px; border-bottom:1.5px solid var(--ink);}
+  table.out th:first-child{text-align:center;}
+  table.out td{text-align:right; padding:6px 8px; border-bottom:1px solid var(--line);}
+  table.out td:first-child{text-align:center; color:var(--muted);}
+  dl.stats{margin:0; font-size:13px;}
+  dl.stats div{display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--line);}
+  dl.stats dt{color:var(--muted);} dl.stats dd{margin:0; font-family:var(--mono); font-weight:600;}
+  details.note{margin-top:22px; border:1px solid var(--line); border-radius:8px; background:#fff;}
+  details.note summary{cursor:pointer; padding:14px 18px; font-weight:650; font-size:13.5px; list-style:none;}
+  details.note summary::-webkit-details-marker{display:none;}
+  details.note summary::before{content:"▸ "; color:var(--fit);}
+  details.note[open] summary::before{content:"▾ ";}
+  details.note .body{padding:2px 18px 20px; font-size:13.5px; color:#25323F;}
+  details.note .body p{margin:0 0 12px;} details.note .body h4{margin:16px 0 6px; font-size:13.5px;}
+  .err{margin-top:12px; padding:10px 13px; border-radius:6px; font-size:13px; background:var(--fit-weak); border:1px solid #E3B8C2; color:#7a1f34; display:none;}
+  footer{margin-top:40px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← pKa 측정 도구로</a>
+  <header class="site">
+    <h1>반트호프 열역학 분석</h1>
+    <p>여러 온도에서 구한 Ka(또는 pKa)로부터 ln Ka를 1/T에 대해 회귀하여 표준 반응 엔탈피·엔트로피·깁스 자유에너지를 산출합니다.
+       각 온도의 pKa는 pKa 측정 도구를 온도별로 실행해 얻은 값을 넣으세요.</p>
+    <span class="eq">ln Ka = −(ΔH°/R)·(1/T) + ΔS°/R&nbsp;&nbsp;→&nbsp;&nbsp;ΔG° = ΔH° − TΔS°</span>
+  </header>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>온도별 데이터</h2>
+      <div class="opts">
+        <label>입력값 종류
+          <select id="mode"><option value="pKa">pKa</option><option value="Ka">Ka</option></select></label>
+        <label>온도 단위
+          <select id="unit"><option value="C">°C</option><option value="K">K</option></select></label>
+        <label>기준 온도 (ΔG°용)
+          <input id="tref" value="25" style="width:80px"></label>
+      </div>
+      <table class="input">
+        <thead><tr><th id="th_t">T (°C)</th><th id="th_v">pKa</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <button class="tiny" id="addRow" style="margin-top:10px;">행 추가</button>
+      <div class="actions">
+        <button class="act primary" id="run">계산하기</button>
+        <button class="act ghost" id="png">그래프 PNG 저장</button>
+      </div>
+      <div class="err" id="err"></div>
+      <p class="hint">임의 테스트값(ΔH°≈+30 kJ/mol 설계)이 채워져 있습니다. 실측 (T, pKa) 쌍으로 교체하세요. 오차 추정에는 3점 이상이 필요합니다.</p>
+    </section>
+
+    <section class="chartwrap">
+      <div id="chart"></div>
+      <div class="readout">
+        <div class="cell"><div class="k">ΔH°</div><div class="v"><span id="ro_h">–</span><span class="u">kJ/mol</span></div></div>
+        <div class="cell"><div class="k">ΔS°</div><div class="v"><span id="ro_s">–</span><span class="u">J/mol·K</span></div></div>
+        <div class="cell"><div class="k">ΔG° (기준T)</div><div class="v"><span id="ro_g">–</span><span class="u">kJ/mol</span></div></div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+    </section>
+  </div>
+
+  <div class="results panel">
+    <div class="rescols">
+      <div>
+        <h2>온도별 계산 표</h2>
+        <table class="out">
+          <thead><tr><th>T (K)</th><th>1000/T</th><th>pKa</th><th>Ka</th><th>ln Ka</th><th>ΔG°(T)</th></tr></thead>
+          <tbody id="outrows"></tbody>
+        </table>
+        <p class="hint">ΔG°(T) = −RT·ln Ka, 단위 kJ/mol. R = 8.314462618 J/mol·K.</p>
+      </div>
+      <div>
+        <h2>회귀 · 열역학량</h2>
+        <dl class="stats" id="statlist"></dl>
+      </div>
+    </div>
+    <details class="note">
+      <summary>해석과 가정 — 반드시 확인</summary>
+      <div class="body">
+        <h4>① 반트호프 선형 가정 (ΔCp ≈ 0)</h4>
+        <p>이 방법은 측정 온도 범위에서 ΔH°와 ΔS°가 온도에 무관하다고 가정합니다. ln Ka 대 1/T가 직선(높은 R²)이면 이 가정이 지지되지만,
+           증명되는 것은 아닙니다. 넓은 온도 범위이거나 곡률이 보이면 열용량 변화(ΔCp) 항을 포함한 비선형 반트호프 분석이 필요합니다.</p>
+        <h4>② 열역학 상수 vs 겉보기 상수</h4>
+        <p>엄밀한 ΔH°·ΔS°·ΔG°는 Ka가 활동도 기반 열역학 상수일 때 성립합니다. 농도 기반 Ka(앞 도구의 산출값이 이 경우에 해당할 수 있음)를 쓰면
+           결과는 이온 세기에 의존하는 <b>겉보기(conditional) 값</b>입니다. 온도 계열 전반에서 이온 세기를 일정하게 고정하고, 필요하면 활동도 보정을 적용하세요.</p>
+        <h4>③ 단위·기준온도</h4>
+        <p>온도는 반드시 절대온도(K)로 환산합니다. ΔG°는 Ka 정의에 내재된 표준상태(통상 1 M) 기준입니다.
+           ΔG°는 <em>ΔH° − TΔS°</em>와 <em>−RT ln Ka</em> 두 경로가 이론상 동일하며, 이 도구는 회귀 예측값을 사용해 두 값을 일치시킵니다.
+           단, 기준온도가 측정 구간의 중심에서 멀어질수록 외삽 불확실성이 커지므로, 기준온도는 측정 구간 안(가급적 중앙 근처)에 두는 것을 권장합니다.</p>
+        <h4>④ 부호 해석</h4>
+        <p>기울기가 음이면 ΔH° &gt; 0(흡열), 양이면 ΔH° &lt; 0(발열). ΔG° &gt; 0이면 표준상태에서 해리가 비자발적(Ka &lt; 1)임을 뜻합니다.
+           약산 지시약은 대개 ΔG° &gt; 0입니다.</p>
+      </div>
+    </details>
+  </div>
+
+  <footer>브라우저에서 클라이언트 측으로만 동작합니다. 회귀·오차전파(표준오차·신뢰구간·예측 표준오차)는 SciPy 결과와 대조 검증된 수치 구현입니다.</footer>
+</div>
+
+<script>
+/* ===== 통계 코어 (pKa 도구와 동일, SciPy 대조 검증) ===== */
+function gammaln(x){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];let y=x,tmp=x+5.5;tmp-=(x+0.5)*Math.log(tmp);let ser=1.000000000190015;for(let j=0;j<6;j++){y+=1;ser+=c[j]/y;}return -tmp+Math.log(2.5066282746310005*ser/x);}
+function betacf(a,b,x){const MAXIT=200,EPS=3e-12,FPMIN=1e-300;let qab=a+b,qap=a+1,qam=a-1,cc=1,d=1-qab*x/qap;if(Math.abs(d)<FPMIN)d=FPMIN;d=1/d;let h=d;for(let m=1;m<=MAXIT;m++){let m2=2*m,aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;cc=1+aa/cc;if(Math.abs(cc)<FPMIN)cc=FPMIN;d=1/d;h*=d*cc;aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;cc=1+aa/cc;if(Math.abs(cc)<FPMIN)cc=FPMIN;d=1/d;let del=d*cc;h*=del;if(Math.abs(del-1)<EPS)break;}return h;}
+function betai(a,b,x){if(x<=0)return 0;if(x>=1)return 1;const bt=Math.exp(gammaln(a+b)-gammaln(a)-gammaln(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*betacf(a,b,x)/a:1-bt*betacf(b,a,1-x)/b;}
+function tinv975(v){let lo=0,hi=1000;for(let i=0;i<200;i++){let m=(lo+hi)/2;if(betai(v/2,0.5,v/(v+m*m))>0.05)lo=m;else hi=m;}return (lo+hi)/2;}
+function regression(x,y){
+  const n=x.length,xb=x.reduce((s,v)=>s+v,0)/n,yb=y.reduce((s,v)=>s+v,0)/n;
+  let Sxx=0,Syy=0,Sxy=0,sumx2=0;
+  for(let i=0;i<n;i++){Sxx+=(x[i]-xb)**2;Syy+=(y[i]-yb)**2;Sxy+=(x[i]-xb)*(y[i]-yb);sumx2+=x[i]*x[i];}
+  const a=Sxy/Sxx,b=yb-a*xb,r2=(Sxy*Sxy)/(Sxx*Syy);
+  const R={a,b,r2,dfree:n-2,n,xb,Sxx};
+  if(n>2){const s2=(Syy-a*Sxy)/(n-2);R.s2=s2;R.sea=Math.sqrt(s2/Sxx);R.seb=Math.sqrt(s2/Sxx*sumx2/n);
+    const tc=tinv975(n-2);R.ci_a=[a-tc*R.sea,a+tc*R.sea];}
+  return R;
+}
+const Rgas=8.314462618, LN10=Math.LN10;
+
+/* ===== 입력 표 ===== */
+const DEFAULT=[["15","6.19"],["20","6.08"],["25","6.00"],["30","5.92"],["35","5.83"]];
+const rowsBody=document.getElementById("rows");
+function addRow(vals){
+  const tr=document.createElement("tr");
+  for(let j=0;j<2;j++){const td=document.createElement("td");const inp=document.createElement("input");inp.value=vals?vals[j]:"";td.appendChild(inp);tr.appendChild(td);}
+  const tdd=document.createElement("td");tdd.className="del";const del=document.createElement("button");del.className="rowdel";del.textContent="×";del.title="행 삭제";del.onclick=()=>tr.remove();tdd.appendChild(del);tr.appendChild(tdd);rowsBody.appendChild(tr);
+}
+DEFAULT.forEach(r=>addRow(r));
+document.getElementById("addRow").onclick=()=>addRow(null);
+
+const modeSel=document.getElementById("mode"), unitSel=document.getElementById("unit");
+function syncHeaders(){
+  document.getElementById("th_v").textContent=modeSel.value;
+  document.getElementById("th_t").textContent="T ("+(unitSel.value==="C"?"°C":"K")+")";
+}
+modeSel.onchange=()=>{syncHeaders();run();};
+unitSel.onchange=()=>{syncHeaders();run();};
+
+/* ===== 실행 ===== */
+const errBox=document.getElementById("err");
+function showErr(m){errBox.textContent=m;errBox.style.display="block";}
+function clearErr(){errBox.style.display="none";}
+function toK(t){return unitSel.value==="C"?t+273.15:t;}
+
+function readInputs(){
+  const trs=[...rowsBody.querySelectorAll("tr")]; const T=[],V=[];
+  trs.forEach((tr,i)=>{
+    const c=[...tr.querySelectorAll("input")].map(e=>e.value.trim());
+    if(c.every(v=>v==="")) return;
+    if(c.some(v=>v==="")) throw new Error((i+1)+"번째 행: 두 칸을 모두 채우거나 모두 비워 주세요.");
+    const nn=c.map(Number); if(nn.some(v=>!isFinite(v))) throw new Error((i+1)+"번째 행: 숫자만 입력하세요.");
+    T.push(nn[0]); V.push(nn[1]);
+  });
+  if(T.length<2) throw new Error("데이터 점이 최소 2개 이상 필요합니다.");
+  const tref=Number(document.getElementById("tref").value.trim());
+  if(!isFinite(tref)) throw new Error("기준 온도에 숫자를 입력하세요.");
+  return {T,V,tref};
+}
+
+let last=null;
+function run(){
+  let inp; try{inp=readInputs();}catch(e){showErr(e.message);return;}
+  clearErr();
+  const {T,V,tref}=inp; const mode=modeSel.value;
+  const TK=T.map(toK); if(TK.some(t=>t<=0)){showErr("절대온도가 0 이하입니다. 온도 단위를 확인하세요.");return;}
+  let pKa=[],Ka=[],lnKa=[];
+  for(let i=0;i<V.length;i++){
+    if(mode==="pKa"){ pKa.push(V[i]); Ka.push(Math.pow(10,-V[i])); lnKa.push(-V[i]*LN10); }
+    else { if(V[i]<=0){showErr((i+1)+"번째 행: Ka는 0보다 커야 합니다.");return;} Ka.push(V[i]); lnKa.push(Math.log(V[i])); pKa.push(-Math.log10(V[i])); }
+  }
+  const x=TK.map(t=>1/t), y=lnKa;
+  const R=regression(x,y);
+  const dH=-R.a*Rgas, dS=R.b*Rgas;                     // J/mol, J/mol/K
+  const TrefK=toK(tref), x0=1/TrefK;
+  const yhat=R.b+R.a*x0, KaRef=Math.exp(yhat), dG=-Rgas*TrefK*yhat;  // J/mol
+  let sdH=null,sdS=null,sdG=null;
+  if(R.s2!=null){ sdH=Rgas*R.sea; sdS=Rgas*R.seb;
+    const seFit=Math.sqrt(R.s2*(1/R.n+(x0-R.xb)**2/R.Sxx)); sdG=Rgas*TrefK*seFit; }
+  last={TK,pKa,Ka,lnKa,x,R,dH,dS,dG,sdH,sdS,sdG,TrefK,KaRef,tref};
+  renderAll(last);
+  drawChart(x,y,R);
+}
+function f(v,d){return (v==null||!isFinite(v))?"–":Number(v).toFixed(d);}
+function sci(v){ if(v==null||!isFinite(v))return "–"; const e=Math.floor(Math.log10(Math.abs(v))); const m=v/Math.pow(10,e); return m.toFixed(2)+"e"+e; }
+
+function renderAll(D){
+  // readout
+  document.getElementById("ro_h").textContent=f(D.dH/1000,2);
+  document.getElementById("ro_s").textContent=f(D.dS,2);
+  document.getElementById("ro_g").textContent=f(D.dG/1000,2);
+  // 표
+  const tb=document.getElementById("outrows"); tb.innerHTML="";
+  for(let i=0;i<D.TK.length;i++){
+    const dGi=-Rgas*D.TK[i]*D.lnKa[i]/1000;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${f(D.TK[i],2)}</td><td>${f(1000/D.TK[i],3)}</td><td>${f(D.pKa[i],3)}</td>
+      <td>${sci(D.Ka[i])}</td><td>${f(D.lnKa[i],3)}</td><td>${f(dGi,2)}</td>`;
+    tb.appendChild(tr);
+  }
+  // 통계
+  const R=D.R, rows=[
+    ["기울기 (−ΔH°/R)", R.sea!=null?`${f(R.a,2)} ± ${f(R.sea,2)}`:f(R.a,2)],
+    ["절편 (ΔS°/R)", R.seb!=null?`${f(R.b,4)} ± ${f(R.seb,4)}`:f(R.b,4)],
+    ["결정계수 R²", f(R.r2,5)],
+    ["ΔH°", D.sdH!=null?`${f(D.dH/1000,2)} ± ${f(D.sdH/1000,2)} kJ/mol`:`${f(D.dH/1000,2)} kJ/mol`],
+    ["ΔS°", D.sdS!=null?`${f(D.dS,2)} ± ${f(D.sdS,2)} J/mol·K`:`${f(D.dS,2)} J/mol·K`],
+    ["기준 온도", `${f(D.TrefK,2)} K`],
+    ["Ka (기준 T)", sci(D.KaRef)],
+    ["ΔG° (기준 T)", D.sdG!=null?`${f(D.dG/1000,2)} ± ${f(D.sdG/1000,2)} kJ/mol`:`${f(D.dG/1000,2)} kJ/mol`],
+  ];
+  document.getElementById("statlist").innerHTML=rows.map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+  // verdict
+  renderVerdict(D);
+}
+function renderVerdict(D){
+  const el=document.getElementById("verdict");
+  const endo = D.dH>0;
+  const enthalpyTag = endo?`<span class="tag warn">흡열 ΔH°&gt;0</span>`:`<span class="tag ok">발열 ΔH°&lt;0</span>`;
+  const entTag = D.dS>0?`<span class="tag blue">ΔS°&gt;0</span>`:`<span class="tag blue">ΔS°&lt;0</span>`;
+  const spont = D.dG<0?`표준상태에서 자발적(Ka&gt;1)`:`표준상태에서 비자발적(Ka&lt;1)`;
+  let ciNote="";
+  if(D.R.ci_a){ const c=D.R.ci_a; const zeroIn = c[0]<=0 && 0<=c[1];
+    ciNote = zeroIn ? ` 다만 기울기 95% CI가 0을 포함하여 ΔH°가 0과 유의차가 없을 수 있습니다.` : ""; }
+  el.innerHTML = `해리 반응은 ${enthalpyTag} · ${entTag} 이며, 기준 온도 ${f(D.TrefK,2)} K에서 <b>${spont}</b>.`
+    + ` R² = ${f(D.R.r2,4)} 로 ln Ka–1/T 직선성이 ${D.R.r2>0.99?"양호":"보통"}합니다.${ciNote}`;
+}
+
+/* ===== 그래프 ===== */
+function niceNum(x,round){const e=Math.floor(Math.log10(x)),ff=x/Math.pow(10,e);let nf;if(round){nf=ff<1.5?1:ff<3?2:ff<7?5:10;}else{nf=ff<=1?1:ff<=2?2:ff<=5?5:10;}return nf*Math.pow(10,e);}
+function axis(min,max,count){if(min===max){min-=Math.abs(min)*0.05||0.5;max+=Math.abs(max)*0.05||0.5;}const range=niceNum(max-min,false),step=niceNum(range/(count-1),true);const gmin=Math.floor(min/step)*step,gmax=Math.ceil(max/step)*step;const ticks=[];for(let v=gmin;v<=gmax+step*0.5;v+=step)ticks.push(+v.toFixed(12));return {gmin,gmax,ticks,step};}
+function decdigits(step){return Math.max(0,Math.min(6,Math.ceil(-Math.log10(step))+1));}
+function drawChart(xr,yr,R){
+  const W=640,H=470,ml=72,mr=22,mt=26,mb=54,pw=W-ml-mr,ph=H-mt-mb;
+  const xmin=Math.min(...xr),xmax=Math.max(...xr),ymin=Math.min(...yr),ymax=Math.max(...yr);
+  const xpad=(xmax-xmin)*0.12||1e-4, ypad=(ymax-ymin)*0.15||0.5;
+  const AX=axis(xmin-xpad,xmax+xpad,6),AY=axis(ymin-ypad,ymax+ypad,6);
+  const sx=v=>ml+(v-AX.gmin)/(AX.gmax-AX.gmin)*pw, sy=v=>mt+ph-(v-AY.gmin)/(AY.gmax-AY.gmin)*ph;
+  const Fs="font-family:system-ui,'Segoe UI','Malgun Gothic',sans-serif;",Ms="font-family:ui-monospace,'SF Mono',Consolas,monospace;";
+  const xd=decdigits(AX.step*1000), yd=decdigits(AY.step);
+  let s=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"><rect width="${W}" height="${H}" fill="#fff"/>`;
+  AY.ticks.forEach(t=>{const y=sy(t);if(y<mt-1||y>mt+ph+1)return;s+=`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="#EDEFF1"/><text x="${ml-9}" y="${y+4}" text-anchor="end" fill="#5E6B78" font-size="12" style="${Ms}">${(+t).toFixed(yd)}</text>`;});
+  AX.ticks.forEach(t=>{const x=sx(t);if(x<ml-1||x>ml+pw+1)return;s+=`<line x1="${x}" y1="${mt}" x2="${x}" y2="${mt+ph}" stroke="#EDEFF1"/><text x="${x}" y="${mt+ph+20}" text-anchor="middle" fill="#5E6B78" font-size="12" style="${Ms}">${(t*1000).toFixed(xd)}</text>`;});
+  s+=`<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="#14202E" stroke-width="1.3"/><line x1="${ml}" y1="${mt}" x2="${ml}" y2="${mt+ph}" stroke="#14202E" stroke-width="1.3"/>`;
+  s+=`<text x="${ml+pw/2}" y="${H-12}" text-anchor="middle" fill="#14202E" font-size="13" style="${Fs}">1/T ( ×10⁻³ K⁻¹ )</text>`;
+  s+=`<text x="18" y="${mt+ph/2}" text-anchor="middle" fill="#14202E" font-size="13" style="${Fs}" transform="rotate(-90 18 ${mt+ph/2})">ln Ka</text>`;
+  const x1=Math.max(xmin,AX.gmin),x2=Math.min(xmax,AX.gmax);
+  s+=`<line x1="${sx(x1)}" y1="${sy(R.a*x1+R.b)}" x2="${sx(x2)}" y2="${sy(R.a*x2+R.b)}" stroke="#B0324B" stroke-width="2.2"/>`;
+  xr.forEach((x,i)=>{s+=`<circle cx="${sx(x)}" cy="${sy(yr[i])}" r="4.5" fill="#1F4E79" stroke="#fff" stroke-width="1.2"/>`;});
+  const bx=ml+12,by=mt+10;
+  s+=`<rect x="${bx}" y="${by}" width="182" height="62" rx="6" fill="#fff" stroke="#DDE2E6"/>`;
+  s+=`<text x="${bx+11}" y="${by+20}" fill="#14202E" font-size="12" style="${Ms}">slope = ${R.a.toFixed(1)}</text>`;
+  s+=`<text x="${bx+11}" y="${by+37}" fill="#14202E" font-size="12" style="${Ms}">intercept = ${R.b.toFixed(3)}</text>`;
+  s+=`<text x="${bx+11}" y="${by+54}" fill="#14202E" font-size="12" style="${Ms}">R² = ${R.r2.toFixed(4)}</text>`;
+  const lx=ml+pw-128,ly=mt+ph-46;
+  s+=`<rect x="${lx}" y="${ly}" width="118" height="40" rx="6" fill="#fff" stroke="#DDE2E6"/>`;
+  s+=`<circle cx="${lx+14}" cy="${ly+14}" r="4.5" fill="#1F4E79" stroke="#fff" stroke-width="1.2"/><text x="${lx+26}" y="${ly+18}" fill="#14202E" font-size="12" style="${Fs}">측정값</text>`;
+  s+=`<line x1="${lx+7}" y1="${ly+30}" x2="${lx+21}" y2="${ly+30}" stroke="#B0324B" stroke-width="2.2"/><text x="${lx+26}" y="${ly+34}" fill="#14202E" font-size="12" style="${Fs}">적합선</text>`;
+  s+=`</svg>`;
+  document.getElementById("chart").innerHTML=s;
+}
+
+/* ===== PNG ===== */
+document.getElementById("png").onclick=function(){
+  if(!last){showErr("먼저 계산하기를 실행하세요.");return;}
+  const svg=document.querySelector("#chart svg");if(!svg)return;
+  const vb=svg.viewBox.baseVal,scale=2;
+  const url="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svg))));
+  const img=new Image();
+  img.onload=function(){const c=document.createElement("canvas");c.width=vb.width*scale;c.height=vb.height*scale;const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);const a=document.createElement("a");a.download="vanthoff_plot.png";a.href=c.toDataURL("image/png");a.click();};
+  img.src=url;
+};
+
+document.getElementById("run").onclick=run;
+syncHeaders(); run();
+</script>
+</body>
+</html>
